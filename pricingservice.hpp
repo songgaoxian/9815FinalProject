@@ -9,8 +9,9 @@
 
 #include <string>
 #include "soa.hpp"
+#include "products.hpp"
 #include <map>
-#include <unordered_map>
+#include "tradebookingservice.hpp"
 #include <algorithm>
 
 /**
@@ -22,7 +23,6 @@ class Price
 {
 
 public:
-
   // ctor for a price
   Price(const T &_product, double _mid, double _bidOfferSpread);
 
@@ -39,7 +39,6 @@ private:
   const T& product;
   double mid;
   double bidOfferSpread;
-
 };
 
 /**
@@ -49,56 +48,95 @@ private:
  */
 template<typename T>
 class PricingService : public Service<string,Price <T> >
-{
-};
+{};
 
-class BondPricingService: public PricingService<Bond>
+//specify bondpriceservice
+class BondPriceService: public PricingService<Bond>
 {
-   BondPricingService(){}
-   //return best price given a key
-  virtual Price<Bond>& GetData(string key){
-    //declare the result pair to get all possible results
-    pair<multimap<string, Price<Bond> >::iterator, multimap<string, Price<Bond> >::iterator> result;
-    //initialize result
-    result=priceRecord.equal_range(key);
-    //declare Price to return
-    Price<Bond> p;
-    //my question is how to decide which price to return
-    //result contains all the prices consistent with the given key
-    //how to choose one price from the result
-    return p;
-  }
- // The callback that a Connector should invoke for any new or updated data
+public:
+  BondPriceService(){}//constructor
+   // Get data on our service given a key
+  virtual Price<Bond>& GetData(string key){return bondPriceCache.find(key)->second;}
+
+  // The callback that a Connector should invoke for any new or updated data
   virtual void OnMessage(Price<Bond> &data){
-     //get product
-     Bond product=data.GetProduct();
-     //get product id
-     string id=product.GetProductId();
-     //record data in priceRecord
-     priceRecord.insert(pair<string, Price<Bond> >(id, data));
+    //get bond
+    Bond bnd=data.GetProduct();
+    //get bond id
+    string bndid=bnd.GetProductId();
+    if(bondPriceCache.find(bndid)==bondPriceCache.end()){
+      //insert data to cache
+      bondPriceCache.insert(make_pair(bndid,data));
+      //use listeners to add
+      for(int i=0;i<bondPriceListeners.size();++i)
+        bondPriceListeners[i]->ProcessAdd(data);
+    }
+    else{
+      bondPriceCache.erase(bndid);//erase bndid
+      //update data
+      bondPriceCache.insert(make_pair(bndid,data));
+      //use listeners to update
+      for(int i=0;i<bondPriceListeners.size();++i)
+        bondPriceListeners[i]->ProcessUpdate(data);
+    }
   }
 
   // Add a listener to the Service for callbacks on add, remove, and update events
   // for data to the Service.
-  virtual void AddListener(ServiceListener<Price<Bond> > *listener){
-    price_listeners.push_back(listener);
-  }
+  virtual void AddListener(ServiceListener<Price<Bond> > *listener){bondPriceListeners.push_back(listener);}
 
   // Get all listeners on the Service.
-  virtual const vector< ServiceListener<Price<Bond> >* >& GetListeners() const{return price_listeners;}
+  virtual const vector< ServiceListener<Price<Bond> >* >& GetListeners() const{return bondPriceListeners;}
+
 private:
-  multimap<string, Price<Bond> > priceRecord; //keyed on product ID for price
-  vector<ServiceListener<Price<Bond> >* > price_listeners;
+  map<string, Price<Bond> > bondPriceCache;//store price records
+  vector<ServiceListener<Price<Bond> >* > bondPriceListeners;  
 };
-//PricingServiceConnector create data in prices.txt and flow them to PricingService
-class BondPricingConnector: public Connector<Price<Bond> >
+
+//specify connector for pricing service
+class BondPriceConnector: public Connector<Price<Bond> >
 {
+private:
+  int counter;//get counter
 public:
-   virtual void Publish(Price<Bond> &data){}
-   PricingServiceConnector(){}
-   PricingServiceConnector(PricingService<Bond> & p_service, unordered_map<string, Bond> m_bond){
-     //it will read from prices.txt and call OnMessage to record all prices in multimap priceRecord
-   }
+  //constructor
+  BondPriceConnector(){counter=0;}
+  // Publish data to the Connector
+  virtual void Publish(Price<Bond> &data){}//do nothing
+  //subscribe and return subscribed data
+  virtual Price<Bond> Subscribe(BondPriceService& bprice_service, map<string, Bond> m_bond){
+    ifstream file;
+    file.open("./Input/prices.txt");//open file
+    string line;//store one line
+    getline(file,line);//read header line
+    for(int i=0;i<=counter;++i)
+      getline(file,line);//read line
+    ++counter;//update counter
+    vector<string> tradelines;//store info about readed line
+    vector<string> priceparts;//store parts of prices
+    boost::split(tradelines,line,boost::is_any_of(","));//split line
+    string bondId=tradelines[0];//get bond id
+    string bidstr=tradelines[1];//get bid string
+    string spreadstr=tradelines[3];//get spread string
+    double spd=int(spreadstr[0]-'0')*1.0/256.0;//convert to double
+    boost::split(priceparts,bidstr,boost::is_any_of("-"));//split bidstr
+    string bid1=priceparts[0];//get part 1 of bid
+    string bid2=priceparts[1];//get part 2 of bid
+    double bid1num=0;//get bid num
+    for(int i=0;i<bid1.length();++i){
+      int current=int(bid1[i]-'0');//get current digit
+      bid1num+=current*pow(10,bid1.length()-i-1);//get first part of bid
+    }
+    double bid2num=10.0*int(bid2[0]-'0')+int(bid2[1]-'0');//get bid2num
+    bid2num=bid2num/32.0;
+    double bid3num=int(bid2[2]-'0')/256.0;//get part 3 of bid
+    double bidtotal=bid1num+bid2num+bid3num;//sum up bid
+    double mid=bidtotal+0.5*spd; //get mid price
+    Bond bnd=m_bond[bondId];//get bond
+    Price<Bond> p_bond(bnd,mid,spd);//construct price
+    bprice_service.OnMessage(p_bond);//flow data to service
+    return p_bond;
+  }
 };
 
 template<typename T>
