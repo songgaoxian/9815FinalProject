@@ -122,9 +122,9 @@ private:
 class BondTradeListener: public ServiceListener<Trade<Bond> >
 {
 private:
-  BondPositionService bp_service;
+  BondPositionService& bp_service;
 public:
-  BondTradeListener(){}//constructor
+  //BondTradeListener(){}//constructor
   BondTradeListener(BondPositionService& service):bp_service(service){}//constructor
   // Listener callback to process adding a trade
   virtual void ProcessAdd(Trade<Bond> &data){

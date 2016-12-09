@@ -2,6 +2,7 @@
 #include "positionservice.hpp"
 #include "pricingservice.hpp"
 #include "riskservice.hpp"
+#include "marketdataservice.hpp"
 
 map<string, Bond> GetBonds(){
 	map<string, Bond> m_bond;
@@ -55,8 +56,22 @@ int main(){
     BondPriceConnector bp_connector;
     Price<Bond> pbnd=bp_connector.Subscribe(bp_service,m_bond);
     cout<<pbnd.GetMid()<<"\n";
-    
 
+    bndrisk.GetData(bids[2]);
+    vector<Bond> v_bond{m_bond[bids[2]],m_bond[bids[3]]};
+    BucketedSector<Bond> buck_bnd(v_bond,"hello");
+    PV01<BucketedSector<Bond> > sector_bnd=bndrisk.GetBucketedRisk(buck_bnd);
+    cout<<sector_bnd.GetPV01()<<"\n";
+
+    //marketdataservice has debug-purpose cout
+    BondMarketDataService bm_ds;
+    BondMarketDataConnector bm_connect;
+    for(int i=0;i<12;++i){
+      bm_connect.Subscribe(bm_ds,m_bond);
+    }
+    BidOffer bid_offer=bm_ds.GetBestBidOffer(bids[0]);
+    Order od=bid_offer.GetBidOrder();
+    cout<<"bondid="<<bids[0]<<" has best bid="<<od.GetPrice()<<"\n";
 
     return 0;
 }

@@ -86,7 +86,7 @@ public:
 
   // Get the bucketed risk for the bucket sector
   //const PV01<T>& GetBucketedRisk(const BucketedSector<T> &sector) const = 0;
-  virtual double GetBucketedRisk(const BucketedSector<T> &sector) const=0;
+  virtual const PV01<BucketedSector<T> > GetBucketedRisk(const BucketedSector<T> &sector) const=0;
 
 };
 //implement risk service for bond
@@ -150,26 +150,31 @@ public:
   }
 
   // Get the bucketed risk for the bucket sector
-  virtual double GetBucketedRisk(const BucketedSector<Bond> &sector) const{
+  virtual const PV01<BucketedSector<Bond> > GetBucketedRisk(const BucketedSector<Bond> &sector) const{
     //assume all bonds in sector has pv01 record in cache
     vector<Bond> bonds=sector.GetProducts();
     double risk_bucket=0;
+    long sum_quantity=0;
     for(int i=0;i<bonds.size();++i){
       //iterate bonds
       Bond bnd=bonds[i];//get bond
       string bid=bnd.GetProductId();//get bond id
+      if(bondRiskCache.find(bid)==bondRiskCache.end()){throw "not enough info";}
       PV01<Bond> thepv01=bondRiskCache.find(bid)->second;//get the pv01 of this bond
       long q=thepv01.GetQuantity();//get quantity of the associated pv01
       risk_bucket+=double(q)*thepv01.GetPV01();//get accumulate risk of the bucket
+      sum_quantity+=q;//get the sum of associated products
     }
-    return risk_bucket;
+    double bucket_pv01=risk_bucket/double(sum_quantity);//compute pv01 for bucket
+    PV01<BucketedSector<Bond> > sector_pv01(sector, bucket_pv01, sum_quantity);//get pv01 of bucket
+    return sector_pv01;
   }
 };
 
 class BondPositionServiceListener: public ServiceListener<Position<Bond> >
 {
 private:
-  BondRiskService bnd_risk_service;
+  BondRiskService& bnd_risk_service;
 public:
   BondPositionServiceListener(BondRiskService& bnd_risk): bnd_risk_service(bnd_risk){}
   // Listener callback to process an add event to the Service
