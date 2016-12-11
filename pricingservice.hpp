@@ -59,28 +59,7 @@ public:
   virtual Price<Bond>& GetData(string key){return bondPriceCache.find(key)->second;}
 
   // The callback that a Connector should invoke for any new or updated data
-  virtual void OnMessage(Price<Bond> &data){
-    //get bond
-    Bond bnd=data.GetProduct();
-    //get bond id
-    string bndid=bnd.GetProductId();
-    if(bondPriceCache.find(bndid)==bondPriceCache.end()){
-      //insert data to cache
-      bondPriceCache.insert(make_pair(bndid,data));
-      //use listeners to add
-      for(int i=0;i<bondPriceListeners.size();++i)
-        bondPriceListeners[i]->ProcessAdd(data);
-    }
-    else{
-      bondPriceCache.erase(bndid);//erase bndid
-      //update data
-      bondPriceCache.insert(make_pair(bndid,data));
-      //use listeners to update
-      for(int i=0;i<bondPriceListeners.size();++i)
-        bondPriceListeners[i]->ProcessUpdate(data);
-    }
-  }
-
+  virtual void OnMessage(Price<Bond> &data);
   // Add a listener to the Service for callbacks on add, remove, and update events
   // for data to the Service.
   virtual void AddListener(ServiceListener<Price<Bond> > *listener){bondPriceListeners.push_back(listener);}
@@ -104,7 +83,58 @@ public:
   // Publish data to the Connector
   virtual void Publish(Price<Bond> &data){}//do nothing
   //subscribe and return subscribed data
-  virtual Price<Bond> Subscribe(BondPriceService& bprice_service, map<string, Bond> m_bond){
+  virtual Price<Bond> Subscribe(BondPriceService& bprice_service, map<string, Bond> m_bond);
+};
+
+template<typename T>
+Price<T>::Price(const T &_product, double _mid, double _bidOfferSpread) :
+  product(_product)
+{
+  mid = _mid;
+  bidOfferSpread = _bidOfferSpread;
+}
+
+template<typename T>
+const T& Price<T>::GetProduct() const
+{
+  return product;
+}
+
+template<typename T>
+double Price<T>::GetMid() const
+{
+  return mid;
+}
+
+template<typename T>
+double Price<T>::GetBidOfferSpread() const
+{
+  return bidOfferSpread;
+}
+
+void BondPriceService::OnMessage(Price<Bond> &data){
+    //get bond
+    Bond bnd=data.GetProduct();
+    //get bond id
+    string bndid=bnd.GetProductId();
+    if(bondPriceCache.find(bndid)==bondPriceCache.end()){
+      //insert data to cache
+      bondPriceCache.insert(make_pair(bndid,data));
+      //use listeners to add
+      for(int i=0;i<bondPriceListeners.size();++i)
+        bondPriceListeners[i]->ProcessAdd(data);
+    }
+    else{
+      bondPriceCache.erase(bndid);//erase bndid
+      //update data
+      bondPriceCache.insert(make_pair(bndid,data));
+      //use listeners to update
+      for(int i=0;i<bondPriceListeners.size();++i)
+        bondPriceListeners[i]->ProcessUpdate(data);
+    }
+  }
+
+Price<Bond> BondPriceConnector::Subscribe(BondPriceService& bprice_service, map<string, Bond> m_bond){
     ifstream file;
     file.open("./Input/prices.txt");//open file
     string line;//store one line
@@ -137,32 +167,4 @@ public:
     bprice_service.OnMessage(p_bond);//flow data to service
     return p_bond;
   }
-};
-
-template<typename T>
-Price<T>::Price(const T &_product, double _mid, double _bidOfferSpread) :
-  product(_product)
-{
-  mid = _mid;
-  bidOfferSpread = _bidOfferSpread;
-}
-
-template<typename T>
-const T& Price<T>::GetProduct() const
-{
-  return product;
-}
-
-template<typename T>
-double Price<T>::GetMid() const
-{
-  return mid;
-}
-
-template<typename T>
-double Price<T>::GetBidOfferSpread() const
-{
-  return bidOfferSpread;
-}
-
 #endif

@@ -36,15 +36,7 @@ public:
   // Get the aggregate position
   long GetAggregatePosition();
   //Add to positions
-  void AddToPosition(long quantity, string book){
-    if(positions.find(book)==positions.end()){
-      //add quantity to positions
-      positions.insert(make_pair(book, quantity));
-    }
-    else{
-      positions[book]+=quantity;//update book
-    }
-  }
+  void AddToPosition(long quantity, string book);
 
 private:
   T product;
@@ -84,7 +76,67 @@ public:
   // Get all listeners on the Service.
   virtual const vector< ServiceListener<Position<Bond> >* >& GetListeners() const {return bondPositionListeners;}
   //Add a trade to the service
-  virtual void AddTrade(const Trade<Bond> &trade){
+  virtual void AddTrade(const Trade<Bond> &trade);
+
+private:
+  map<string, Position<Bond> > bondPositionCache; //store position info
+  vector<ServiceListener<Position<Bond> >* > bondPositionListeners;//store listeners
+};
+
+//implement BondTradeBookingServiceListener
+class BondTradeListener: public ServiceListener<Trade<Bond> >
+{
+private:
+  BondPositionService& bp_service;
+public:
+  //BondTradeListener(){}//constructor
+  BondTradeListener(BondPositionService& service):bp_service(service){}//constructor
+  // Listener callback to process adding a trade
+  virtual void ProcessAdd(Trade<Bond> &data){
+    bp_service.AddTrade(data);
+  }
+
+  // Listener callback to process a remove event to the Service
+  virtual void ProcessRemove(Trade<Bond> &data);
+
+  // Listener callback to process an update event to the Service
+  virtual void ProcessUpdate(Trade<Bond> &data){
+  }
+};
+
+
+
+template<typename T>
+Position<T>::Position(const T &_product) : product(_product){}
+
+template<typename T>
+const T& Position<T>::GetProduct() const { return product;}
+
+template<typename T>
+long Position<T>::GetPosition(string &book) { return positions[book];}
+
+template<typename T>
+long Position<T>::GetAggregatePosition()
+{
+  // No-op implementation - should be filled out for implementations
+  long pos=0;//initialize aggregate position
+  for(map<string,long>::iterator it=positions.begin();it!=positions.end();++it)
+    pos+=it->second; //get aggregate position
+  return pos;
+}
+
+template<typename T>
+void Position<T>::AddToPosition(long quantity, string book){
+    if(positions.find(book)==positions.end()){
+      //add quantity to positions
+      positions.insert(make_pair(book, quantity));
+    }
+    else{
+      positions[book]+=quantity;//update book
+    }
+  }
+
+void BondPositionService::AddTrade(const Trade<Bond> &trade){
     Bond bnd=trade.GetProduct();//get bond
     string bid=bnd.GetProductId();//get bond id
     string book=trade.GetBook();
@@ -113,26 +165,7 @@ public:
     }
   }
 
-private:
-  map<string, Position<Bond> > bondPositionCache; //store position info
-  vector<ServiceListener<Position<Bond> >* > bondPositionListeners;//store listeners
-};
-
-//implement BondTradeBookingServiceListener
-class BondTradeListener: public ServiceListener<Trade<Bond> >
-{
-private:
-  BondPositionService& bp_service;
-public:
-  //BondTradeListener(){}//constructor
-  BondTradeListener(BondPositionService& service):bp_service(service){}//constructor
-  // Listener callback to process adding a trade
-  virtual void ProcessAdd(Trade<Bond> &data){
-    bp_service.AddTrade(data);
-  }
-
-  // Listener callback to process a remove event to the Service
-  virtual void ProcessRemove(Trade<Bond> &data){
+ void BondTradeListener::ProcessRemove(Trade<Bond> &data){
     Side side1=data.GetSide();//get side of trade to remove
     if(side1==BUY) side1=SELL;
     else side1=BUY; //flip side
@@ -144,30 +177,5 @@ public:
     bp_service.AddTrade(reverseTrade);
   }
 
-  // Listener callback to process an update event to the Service
-  virtual void ProcessUpdate(Trade<Bond> &data){
-  }
-};
-
-
-
-template<typename T>
-Position<T>::Position(const T &_product) : product(_product){}
-
-template<typename T>
-const T& Position<T>::GetProduct() const { return product;}
-
-template<typename T>
-long Position<T>::GetPosition(string &book) { return positions[book];}
-
-template<typename T>
-long Position<T>::GetAggregatePosition()
-{
-  // No-op implementation - should be filled out for implementations
-  long pos=0;//initialize aggregate position
-  for(map<string,long>::iterator it=positions.begin();it!=positions.end();++it)
-    pos+=it->second; //get aggregate position
-  return pos;
-}
 
 #endif

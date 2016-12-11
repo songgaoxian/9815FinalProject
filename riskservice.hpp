@@ -86,7 +86,7 @@ public:
 
   // Get the bucketed risk for the bucket sector
   //const PV01<T>& GetBucketedRisk(const BucketedSector<T> &sector) const = 0;
-  virtual const PV01<BucketedSector<T> > GetBucketedRisk(const BucketedSector<T> &sector) const=0;
+  virtual const PV01<BucketedSector<Bond> > GetBucketedRisk(const BucketedSector<T> &sector) const=0;
 
 };
 //implement risk service for bond
@@ -99,20 +99,8 @@ private:
 public:
   //bondPV01_ must contain all 6 bonds pv01 info
   BondRiskService(map<string,double>& bondPV01_):bondPV01(bondPV01_){}
-  void UpdateBondPV01(string bondid, double newpv01){
-    //assume bondPV01 always contain all bonds'pv01 info
-    bondPV01[bondid]=newpv01;
-    //get the corresponding record in cache
-    map<string,PV01<Bond> >::iterator the_pv01=bondRiskCache.find(bondid);
-    if(the_pv01!=bondRiskCache.end()){
-      //only when the corresponding cache exists for the bond, it is necessary to update
-      the_pv01->second.SetPV01(newpv01);
-      for(int i=0;i<bondRiskListeners.size();++i){
-        //update
-        bondRiskListeners[i]->ProcessUpdate(the_pv01->second);//use update when value of pv01 changes
-      }
-    }
-  }
+  void UpdateBondPV01(string bondid, double newpv01);
+
    // Get data on our service given a key
   virtual PV01<Bond>& GetData(string key){return bondRiskCache.find(key)->second;}
 
@@ -126,49 +114,10 @@ public:
   // Get all listeners on the Service.
   virtual const vector< ServiceListener<PV01<Bond> >* >& GetListeners() const{return bondRiskListeners;}
   // Add a position that the service will risk
-  virtual void AddPosition(Position<Bond> &position){
-    Bond bnd=position.GetProduct();//get bond of the position
-    string rid=bnd.GetProductId();//get product id of the bond
-    double pv_01=bondPV01[rid];//get pv01 value of the bond
-    long quantity=position.GetAggregatePosition();//get the
-    PV01<Bond> pv01_bnd(bnd,pv_01,quantity);//construct the pv01 to add
-    map<string, PV01<Bond> >::iterator the_pv01=bondRiskCache.find(rid);//get the pv01 already exists
-    if(the_pv01==bondRiskCache.end()){
-      //new product entry
-      bondRiskCache.insert(make_pair(rid,pv01_bnd));//insert into cache
-      for(int i=0;i<bondRiskListeners.size();++i){
-        bondRiskListeners[i]->ProcessAdd(pv01_bnd);//invoke listeners for add
-      }
-    }
-    else{
-      //the pv01 already existed
-      the_pv01->second.AddQuantity(quantity);//update quantity
-      for(int i=0;i<bondRiskListeners.size();++i){
-        bondRiskListeners[i]->ProcessAdd(pv01_bnd);//invoke listeners for add
-      }
-    }
-  }
+  virtual void AddPosition(Position<Bond> &position);
 
   // Get the bucketed risk for the bucket sector
-  virtual const PV01<BucketedSector<Bond> > GetBucketedRisk(const BucketedSector<Bond> &sector) const{
-    //assume all bonds in sector has pv01 record in cache
-    vector<Bond> bonds=sector.GetProducts();
-    double risk_bucket=0;
-    long sum_quantity=0;
-    for(int i=0;i<bonds.size();++i){
-      //iterate bonds
-      Bond bnd=bonds[i];//get bond
-      string bid=bnd.GetProductId();//get bond id
-      if(bondRiskCache.find(bid)==bondRiskCache.end()){throw "not enough info";}
-      PV01<Bond> thepv01=bondRiskCache.find(bid)->second;//get the pv01 of this bond
-      long q=thepv01.GetQuantity();//get quantity of the associated pv01
-      risk_bucket+=double(q)*thepv01.GetPV01();//get accumulate risk of the bucket
-      sum_quantity+=q;//get the sum of associated products
-    }
-    double bucket_pv01=risk_bucket/double(sum_quantity);//compute pv01 for bucket
-    PV01<BucketedSector<Bond> > sector_pv01(sector, bucket_pv01, sum_quantity);//get pv01 of bucket
-    return sector_pv01;
-  }
+  virtual const PV01<BucketedSector<Bond> > GetBucketedRisk(const BucketedSector<Bond> &sector) const;
 };
 
 class BondPositionServiceListener: public ServiceListener<Position<Bond> >
@@ -218,5 +167,63 @@ const string& BucketedSector<T>::GetName() const
 {
   return name;
 }
+
+void BondRiskService::UpdateBondPV01(string bondid, double newpv01){
+    //assume bondPV01 always contain all bonds'pv01 info
+    bondPV01[bondid]=newpv01;
+    //get the corresponding record in cache
+    map<string,PV01<Bond> >::iterator the_pv01=bondRiskCache.find(bondid);
+    if(the_pv01!=bondRiskCache.end()){
+      //only when the corresponding cache exists for the bond, it is necessary to update
+      the_pv01->second.SetPV01(newpv01);
+      for(int i=0;i<bondRiskListeners.size();++i){
+        //update
+        bondRiskListeners[i]->ProcessUpdate(the_pv01->second);//use update when value of pv01 changes
+      }
+    }
+  }
+
+void BondRiskService::AddPosition(Position<Bond> &position){
+    Bond bnd=position.GetProduct();//get bond of the position
+    string rid=bnd.GetProductId();//get product id of the bond
+    double pv_01=bondPV01[rid];//get pv01 value of the bond
+    long quantity=position.GetAggregatePosition();//get the
+    PV01<Bond> pv01_bnd(bnd,pv_01,quantity);//construct the pv01 to add
+    map<string, PV01<Bond> >::iterator the_pv01=bondRiskCache.find(rid);//get the pv01 already exists
+    if(the_pv01==bondRiskCache.end()){
+      //new product entry
+      bondRiskCache.insert(make_pair(rid,pv01_bnd));//insert into cache
+      for(int i=0;i<bondRiskListeners.size();++i){
+        bondRiskListeners[i]->ProcessAdd(pv01_bnd);//invoke listeners for add
+      }
+    }
+    else{
+      //the pv01 already existed
+      the_pv01->second.AddQuantity(quantity);//update quantity
+      for(int i=0;i<bondRiskListeners.size();++i){
+        bondRiskListeners[i]->ProcessAdd(pv01_bnd);//invoke listeners for add
+      }
+    }
+  }
+
+const PV01<BucketedSector<Bond> > BondRiskService::GetBucketedRisk(const BucketedSector<Bond> &sector) const{
+    //assume all bonds in sector has pv01 record in cache
+    vector<Bond> bonds=sector.GetProducts();
+    double risk_bucket=0;
+    long sum_quantity=0;
+    for(int i=0;i<bonds.size();++i){
+      //iterate bonds
+      Bond bnd=bonds[i];//get bond
+      string bid=bnd.GetProductId();//get bond id
+      if(bondRiskCache.find(bid)==bondRiskCache.end()){throw "not enough info";}
+      PV01<Bond> thepv01=bondRiskCache.find(bid)->second;//get the pv01 of this bond
+      long q=thepv01.GetQuantity();//get quantity of the associated pv01
+      risk_bucket+=double(q)*thepv01.GetPV01();//get accumulate risk of the bucket
+      sum_quantity+=q;//get the sum of associated products
+    }
+    double bucket_pv01=risk_bucket/double(sum_quantity);//compute pv01 for bucket
+    PV01<BucketedSector<Bond> > sector_pv01(sector, bucket_pv01, sum_quantity);//get pv01 of bucket
+    return sector_pv01;
+  }
 
 #endif
