@@ -130,7 +130,7 @@ void BondPriceService::OnMessage(Price<Bond> &data){
       bondPriceCache.insert(make_pair(bndid,data));
       //use listeners to update
       for(int i=0;i<bondPriceListeners.size();++i)
-        bondPriceListeners[i]->ProcessUpdate(data);
+        bondPriceListeners[i]->ProcessAdd(data);
     }
   }
 

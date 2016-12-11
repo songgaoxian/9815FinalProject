@@ -4,6 +4,7 @@
 #include "riskservice.hpp"
 #include "marketdataservice.hpp"
 #include "executionservice.hpp"
+#include "streamingservice.hpp"
 
 map<string, Bond> GetBonds(){
 	map<string, Bond> m_bond;
@@ -55,8 +56,16 @@ int main(){
     
     BondPriceService bp_service;
     BondPriceConnector bp_connector;
-    Price<Bond> pbnd=bp_connector.Subscribe(bp_service,m_bond);
-    cout<<pbnd.GetMid()<<"\n";
+    BondAlgoStreamingService b_algo_stream;
+    BondPriceListener* b_price_listener=new BondPriceListener(b_algo_stream);
+    bp_service.AddListener(b_price_listener);
+    BondStreamingService b_stream_service;
+    BondAlgoStreamListener* b_algo_stream_listener=new BondAlgoStreamListener(b_stream_service);
+    b_algo_stream.AddListener(b_algo_stream_listener);
+    for(int i=1;i<=36;++i){
+      Price<Bond> pbnd=bp_connector.Subscribe(bp_service,m_bond);
+      cout<<pbnd.GetMid()<<"\n";
+    }
 
     bndrisk.GetData(bids[2]);
     vector<Bond> v_bond{m_bond[bids[2]],m_bond[bids[3]]};
