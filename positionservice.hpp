@@ -153,6 +153,7 @@ void BondPositionService::AddTrade(const Trade<Bond> &trade){
       for(int i=0;i<bondPositionListeners.size();++i){
         //iterate listeners to add position
         bondPositionListeners[i]->ProcessAdd(pos);
+        bondPositionListeners[i]->ProcessUpdate(pos);
       }
     }
     else{
@@ -161,6 +162,7 @@ void BondPositionService::AddTrade(const Trade<Bond> &trade){
       for(int i=0;i<bondPositionListeners.size();++i){
         //iterate listeners to update position
         bondPositionListeners[i]->ProcessAdd(pos);
+        bondPositionListeners[i]->ProcessUpdate(thepos->second);
       }
     }
   }

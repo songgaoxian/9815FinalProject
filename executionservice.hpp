@@ -379,7 +379,7 @@ void BondExecutionService::ExecuteOrder(const ExecutionOrder<Bond>& order, Marke
       bondExeOrderCache.erase(bondid);//remove old entry
       bondExeOrderCache.insert(make_pair(bondid,order));//insert into cache
       for(int i=0;i<exeOrderListeners.size();++i){
-        exeOrderListeners[i]->ProcessUpdate(copy);//iterate listeners
+        exeOrderListeners[i]->ProcessAdd(copy);//iterate listeners
       }
     }
     pair<Market, ExecutionOrder<Bond> > currentOrder(make_pair(market,copy));

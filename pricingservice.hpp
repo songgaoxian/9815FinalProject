@@ -13,6 +13,7 @@
 #include <map>
 #include "tradebookingservice.hpp"
 #include <algorithm>
+#include <iostream>
 
 /**
  * A price object consisting of mid and bid/offer spread.
@@ -83,7 +84,7 @@ public:
   // Publish data to the Connector
   virtual void Publish(Price<Bond> &data){}//do nothing
   //subscribe and return subscribed data
-  virtual Price<Bond> Subscribe(BondPriceService& bprice_service, map<string, Bond> m_bond);
+  virtual void Subscribe(BondPriceService& bprice_service, map<string, Bond> m_bond);
 };
 
 template<typename T>
@@ -134,13 +135,23 @@ void BondPriceService::OnMessage(Price<Bond> &data){
     }
   }
 
-Price<Bond> BondPriceConnector::Subscribe(BondPriceService& bprice_service, map<string, Bond> m_bond){
+void BondPriceConnector::Subscribe(BondPriceService& bprice_service, map<string, Bond> m_bond){
     ifstream file;
     file.open("./Input/prices.txt");//open file
     string line;//store one line
     getline(file,line);//read header line
-    for(int i=0;i<=counter;++i)
-      getline(file,line);//read line
+    try{
+      for(int i=0;i<=counter;++i)
+        getline(file,line);//read line
+      if(line.length()<4){
+        throw "end of file\n";
+        //a normal data entry line length can never be less than 4
+      }
+    }
+    catch(...){
+      std::cout<<"reached end of file\n";
+      return;
+    }
     ++counter;//update counter
     vector<string> tradelines;//store info about readed line
     vector<string> priceparts;//store parts of prices
@@ -165,6 +176,5 @@ Price<Bond> BondPriceConnector::Subscribe(BondPriceService& bprice_service, map<
     Bond bnd=m_bond[bondId];//get bond
     Price<Bond> p_bond(bnd,mid,spd);//construct price
     bprice_service.OnMessage(p_bond);//flow data to service
-    return p_bond;
   }
 #endif

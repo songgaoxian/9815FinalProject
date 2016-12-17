@@ -1,0 +1,2 @@
+persistKey,InquiryId,ProductId,Side,Quantity,Price,State
+

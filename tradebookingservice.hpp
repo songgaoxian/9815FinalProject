@@ -109,7 +109,7 @@ public:
   //it is a subscribe-only connector, so publish do nothing
   virtual void Publish(Trade<Bond> &data){}
   BondTradeBookingConnector(){counter=0;}
-  virtual Trade<Bond> Subscribe(BondTradeBookService& bt_book_service, map<string, Bond> m_bond);
+  virtual void Subscribe(BondTradeBookService& bt_book_service, map<string, Bond> m_bond);
 };
 
 
@@ -160,23 +160,8 @@ void TradeBookingService<T>::BookTrade(const Trade<T> &trade)
 */
 
 void BondTradeBookService::OnMessage(Trade<Bond> &data){
-    string tid=data.GetTradeId(); //get trade id
     Trade<Bond> tradeCopy=data;
-    map<string, Trade<Bond> >::iterator ptr_trade=bondBookCache.find(tid);//try to find tid
-    if(ptr_trade!=bondBookCache.end()){
-      for(int i=0;i<bondTradeListers.size();++i){
-        bondTradeListers[i]->ProcessRemove(ptr_trade->second); //remove old trade
-        bondTradeListers[i]->ProcessAdd(tradeCopy);//update this trade
-      }
-      bondBookCache.erase(tid);
-      bondBookCache.insert(make_pair(tid,data)); //store data in cache
-    }
-    else{
-      bondBookCache.insert(make_pair(tid,data));
-      //iterate service listeners
-      for(int i=0;i<bondTradeListers.size();++i)
-        bondTradeListers[i]->ProcessAdd(tradeCopy); //invoke listeners
-    }
+    BookTrade(tradeCopy);
   }
 
 void BondTradeBookService::BookTrade(const Trade<Bond> &trade){
@@ -200,15 +185,25 @@ void BondTradeBookService::BookTrade(const Trade<Bond> &trade){
     }
   }
 
-Trade<Bond> BondTradeBookingConnector::Subscribe(BondTradeBookService& bt_book_service, map<string, Bond> m_bond){
+void BondTradeBookingConnector::Subscribe(BondTradeBookService& bt_book_service, map<string, Bond> m_bond){
     ifstream file;
     file.open("./Input/trades.txt");
     string line;//store one line
     vector<string> tradelines; //store info about each line
     //read header line
     getline(file,line);
-    for(int i=0;i<=counter;++i)
-       getline(file,line);//read line
+    try{
+      for(int i=0;i<=counter;++i)
+         getline(file,line);//read line
+       if(line.length()<4){
+        throw "end of file\n";
+        //a normal data entry line length can never be less than 4
+      }
+    }
+    catch(...){
+      cout<<"reached end of file\n";
+      return;
+    }
     ++counter;//increment counter
     boost::split(tradelines,line,boost::is_any_of(",")); //split the line
     string tid=tradelines[0];//get trade id
@@ -223,7 +218,6 @@ Trade<Bond> BondTradeBookingConnector::Subscribe(BondTradeBookService& bt_book_s
     Trade<Bond> tbond1(m_bond[pid],tid,book,quantity,side1);
     //flow data to service via OnMessage
     bt_book_service.OnMessage(tbond1);
-    return tbond1;
   }
 
 #endif

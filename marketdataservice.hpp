@@ -200,7 +200,7 @@ public:
   // Publish data to the Connector
   virtual void Publish(OrderBook<Bond> &data){} //do nothing
   //subscribe and return subscribed data
-  virtual OrderBook<Bond> Subscribe(BondMarketDataService& bmkt_data_service, map<string, Bond> m_bond);
+  virtual void Subscribe(BondMarketDataService& bmkt_data_service, map<string, Bond> m_bond);
 };
 
 
@@ -337,13 +337,23 @@ const OrderBook<Bond> BondMarketDataService::AggregateDepth(const string &produc
     }
   }
 
-  OrderBook<Bond> BondMarketDataConnector::Subscribe(BondMarketDataService& bmkt_data_service, map<string, Bond> m_bond){
+  void BondMarketDataConnector::Subscribe(BondMarketDataService& bmkt_data_service, map<string, Bond> m_bond){
     ifstream file;
     file.open("./Input/marketdata.txt");//open file
     string line;//store one line
     getline(file,line);//read header line
-    for(int i=0;i<=counter;++i)
-      getline(file,line);//read line
+    try{
+      for(int i=0;i<=counter;++i)
+        getline(file,line);//read line
+      if(line.length()<4){
+        throw "end of file\n";
+        //a normal data entry line length can never be less than 4
+      }
+    }
+    catch(...){
+      cout<<"reached end of file\n";
+      return;
+    }
     ++counter;//update counter
     vector<string> infolines;//store info about readed line
     vector<string> priceparts;//store parts of prices
@@ -380,7 +390,6 @@ const OrderBook<Bond> BondMarketDataService::AggregateDepth(const string &produc
     Bond bnd=m_bond[bondId];//get bond
     OrderBook<Bond> result(bnd,bidStack,offerStack);//construct orderbook
     bmkt_data_service.OnMessage(result);//flow into service
-    return result;
   }
 
 #endif

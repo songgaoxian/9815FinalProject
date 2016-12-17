@@ -9,6 +9,7 @@
 
 #include <iostream>
 #include <string>
+#include <cmath>
 
 #include "boost/date_time/gregorian/gregorian.hpp"
 
@@ -16,6 +17,7 @@ using namespace std;
 using namespace boost::gregorian;
 
 enum ProductType { IRSWAP, BOND };
+
 
 /**
  * Base class for a product.
@@ -42,6 +44,8 @@ private:
 
 enum BondIdType { CUSIP, ISIN };
 
+enum BondSectorType {FrontEnd, Belly, LongEnd};
+
 /**
  * Bond product class
  */
@@ -63,6 +67,9 @@ public:
   // Get the maturity date
   const date& GetMaturityDate() const;
 
+  //Get sector type
+  BondSectorType GetSectorType() const;
+
   // Get the bond identifier type
   BondIdType GetBondIdType() const;
 
@@ -77,6 +84,7 @@ private:
   date maturityDate;
 
 };
+
 
 /**
  * Interest Rate Swap enums
@@ -366,6 +374,16 @@ string IRSwap::ToString(SwapLegType swapLegType) const
   case FLY: return "Fly";
   default: return "";
   }
+}
+
+BondSectorType Bond::GetSectorType() const{
+  //current date
+  date current(day_clock::local_day());
+  int year1=abs(current.year()-maturityDate.year());//get years to maturity
+  //return sector type bsed on year
+  if(year1<4) return FrontEnd;
+  if(year1<12) return Belly;
+  return LongEnd;
 }
 
 #endif

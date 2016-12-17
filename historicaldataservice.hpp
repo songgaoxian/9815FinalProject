@@ -10,6 +10,15 @@
 #ifndef HISTORICAL_DATA_SERVICE_HPP
 #define HISTORICAL_DATA_SERVICE_HPP
 
+#include "executionservice.hpp"
+#include "inquiryservice.hpp"
+#include "marketdataservice.hpp"
+#include "positionservice.hpp"
+#include "pricingservice.hpp"
+#include "riskservice.hpp"
+#include "streamingservice.hpp"
+#include "tradebookingservice.hpp" 
+
 /**
  * Service for processing and persisting historical data to a persistent store.
  * Keyed on some persistent key.
@@ -22,8 +31,10 @@ class HistoricalDataService : Service<string,T>
 public:
 
   // Persist data to a store
-  void PersistData(string persistKey, const T& data) = 0;
+  virtual void PersistData(string persistKey, const T& data) = 0;
 
 };
+
+
 
 #endif
